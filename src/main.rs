@@ -1,10 +1,11 @@
 mod types;
 
-use anyhow::{bail, Result};
+use crate::types::{CarlaAutowareBridge, Subscriber};
+use anyhow::Result;
 use futures::{
     join, select,
     stream::{StreamExt, TryStreamExt},
-    try_join, Stream, TryFutureExt,
+    try_join, TryFutureExt,
 };
 use ndarray::Array2;
 use num_traits::FromPrimitive;
@@ -16,20 +17,22 @@ use r2r::{
     autoware_auto_perception_msgs::msg::{
         DetectedObject, DetectedObjectKinematics, DetectedObjects, ObjectClassification, Shape,
     },
+    autoware_auto_planning_msgs::msg::{Trajectory, TrajectoryPoint},
     autoware_auto_vehicle_msgs::msg::SteeringReport,
+    builtin_interfaces::{self, msg::Time},
     carla_msgs::msg::{
         CarlaEgoVehicleControl, CarlaEgoVehicleInfo, CarlaEgoVehicleInfoWheel,
         CarlaEgoVehicleStatus,
     },
     derived_object_msgs::msg::{Object, ObjectArray},
     geometry_msgs::msg::{
-        AccelWithCovariance, AccelWithCovarianceStamped, PoseWithCovariance, TwistWithCovariance,
-        Vector3,
+        AccelWithCovariance, AccelWithCovarianceStamped, PoseStamped, PoseWithCovariance,
+        TwistWithCovariance, Vector3,
     },
     log_warn,
     nav_msgs::msg::{Odometry, Path},
     shape_msgs::msg::SolidPrimitive,
-    Context, Node, ParameterValue, Publisher, QosProfile,
+    Publisher,
 };
 use std::time::Duration;
 use tokio::task::spawn_blocking;
@@ -40,112 +43,49 @@ use crate::types::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let ctx = Context::create()?;
-    let mut node = Node::create(ctx, "carla_autoware_bridge", "/simulator")?;
+    // Construct publishers, subscribers and services, etc.
+    let CarlaAutowareBridge {
+        mut node,
+        autoware_pub,
+        autoware_sub,
+        carla_pub,
+        carla_sub,
+        carla_sc,
+        srv,
+    } = CarlaAutowareBridge::new()?;
 
-    let role_name = {
-        let params = node.params.lock().unwrap();
-        match params.get("role_name") {
-            Some(ParameterValue::String(role_name)) => role_name,
-            Some(_) => bail!("invalid parameter type"),
-            None => "ego_vehicle",
-        }
-        .to_string()
-    };
+    // Create topic-to-topic forwarding tasks
+    let forward_obj = forward_obj(carla_sub.obj, autoware_pub.obj);
+    let forward_odom = forward_odom(carla_sub.odom, autoware_pub.odom);
+    let forward_status = forward_status(
+        carla_sub.vehicle_info,
+        carla_sub.vehicle_status,
+        autoware_pub.accel,
+        autoware_pub.steer_status,
+    );
+    let forward_ackermann = forward_ackermann(autoware_sub.control_cmd, carla_pub.ackermann);
+    let forward_waypoints = forward_waypoints(carla_sub.waypoints, autoware_pub.trajectory);
 
-    // carla subscriptions
-    let carla_obj_sub = node.subscribe::<ObjectArray>(
-        &format!("/carla/{}/objects", role_name),
-        QosProfile::default(),
-    )?;
-    let carla_odom_sub = node.subscribe::<Odometry>(
-        &format!("/carla/{}/odometry", role_name),
-        QosProfile::default(),
-    )?;
-    let carla_vehicle_status_sub = node.subscribe::<CarlaEgoVehicleStatus>(
-        &format!("/carla/{}/vehicle_status", role_name),
-        QosProfile::default(),
-    )?;
-    let carla_vehicle_info_sub = node.subscribe::<CarlaEgoVehicleInfo>(
-        &format!("/carla/{}/vehicle_info", role_name),
-        QosProfile::default(),
-    )?;
-    let carla_waypoints_sub = node.subscribe::<Path>(
-        &format!("/carla/{}/waypoints", role_name),
-        QosProfile::default(),
-    )?;
-
-    // carla publishers
-    let carla_ackermann_pub = node.create_publisher::<AckermannDrive>(
-        &format!("/carla/{}/ackermann_cmd", role_name),
-        QosProfile::default(),
-    )?;
-
-    // autoware subscriptions
-    let autoware_control_cmd_sub = node.subscribe::<AckermannControlCommand>(
-        "/control/command/control_cmd",
-        QosProfile::default(),
-    )?;
-    // let autoware_gear_cmd_sub =
-    //     node.subscribe::<GearCommand>("/control/command/gear_cmd", QosProfile::default())?;
-    // let autoware_hazard_lights_cmd_sub = node.subscribe::<HazardLightsCommand>(
-    //     "/control/command/hazard_lights_cmd",
-    //     QosProfile::default(),
-    // )?;
-    // let autoware_turn_indicators_cmd_sub = node.subscribe::<TurnIndicatorsCommand>(
-    //     "/control/command/turn_indicators_cmd",
-    //     QosProfile::default(),
-    // )?;
-    // let autoware_initial_pose_sub =
-    //     node.subscribe::<PoseWithCovarianceStamped>("/initialpose3d", QosProfile::default())?;
-    // let autoware_engabe_sub = node.subscribe::<Engage>("", QosProfile::default())?;
-
-    // autoware publishers
-    let autoware_accel_pub = node.create_publisher::<AccelWithCovarianceStamped>(
-        "/localization/acceleration",
-        QosProfile::default(),
-    )?;
-    let autoware_odom_pub =
-        node.create_publisher::<Odometry>("/localization/kinematic_state", QosProfile::default())?;
-    let autoware_obj_pub = node.create_publisher::<DetectedObjects>(
-        "/perception/object_recognition/detection/objects",
-        QosProfile::default(),
-    )?;
-    let autoware_steer_status_pub = node.create_publisher::<SteeringReport>(
-        "/vehicle/status/steering_status",
-        QosProfile::default(),
-    )?;
-
-    // tasks
+    // Create a task to spin the node
     let spin_task = spawn_blocking(move || loop {
         node.spin_once(Duration::from_millis(10));
     })
     .map_err(anyhow::Error::from);
-    let forward_obj = forward_obj(carla_obj_sub, autoware_obj_pub);
-    let forward_odom = forward_odom(carla_odom_sub, autoware_odom_pub);
-    let forward_status = forward_status(
-        carla_vehicle_info_sub,
-        carla_vehicle_status_sub,
-        autoware_accel_pub,
-        autoware_steer_status_pub,
-    );
-    let forward_ackermann = forward_ackermann(autoware_control_cmd_sub, carla_ackermann_pub);
 
+    // Wait for all tasks for finish
     try_join!(
         spin_task,
         forward_odom,
         forward_status,
         forward_ackermann,
         forward_obj,
+        forward_waypoints,
     )?;
 
     Ok(())
 }
 
-async fn forward_obj(
-    sub: impl Stream<Item = ObjectArray> + Unpin,
-    pub_: Publisher<DetectedObjects>,
-) -> Result<()> {
+async fn forward_obj(sub: Subscriber<ObjectArray>, pub_: Publisher<DetectedObjects>) -> Result<()> {
     sub.map(anyhow::Ok)
         .try_fold(pub_, |pub_, in_msg| async move {
             let ObjectArray { header, objects } = in_msg;
@@ -270,7 +210,7 @@ async fn forward_obj(
 }
 
 async fn forward_ackermann(
-    sub: impl Stream<Item = AckermannControlCommand> + Unpin,
+    sub: Subscriber<AckermannControlCommand>,
     pub_: Publisher<AckermannDrive>,
 ) -> Result<()> {
     sub.map(anyhow::Ok)
@@ -306,10 +246,7 @@ async fn forward_ackermann(
     Ok(())
 }
 
-async fn forward_odom(
-    sub: impl Stream<Item = Odometry> + Unpin,
-    pub_: Publisher<Odometry>,
-) -> Result<()> {
+async fn forward_odom(sub: Subscriber<Odometry>, pub_: Publisher<Odometry>) -> Result<()> {
     sub.map(anyhow::Ok)
         .try_fold(pub_, |pub_, msg| async move {
             pub_.publish(&msg)?;
@@ -320,8 +257,8 @@ async fn forward_odom(
 }
 
 async fn forward_status(
-    info_sub: impl Stream<Item = CarlaEgoVehicleInfo> + Unpin,
-    status_sub: impl Stream<Item = CarlaEgoVehicleStatus> + Unpin,
+    info_sub: Subscriber<CarlaEgoVehicleInfo>,
+    status_sub: Subscriber<CarlaEgoVehicleStatus>,
     accel_pub: Publisher<AccelWithCovarianceStamped>,
     steer_pub: Publisher<SteeringReport>,
 ) -> Result<()> {
@@ -374,6 +311,49 @@ async fn forward_status(
         };
         accel_pub.publish(&accel_msg)?;
     }
+
+    Ok(())
+}
+
+pub async fn forward_waypoints(sub: Subscriber<Path>, pub_: Publisher<Trajectory>) -> Result<()> {
+    let time_to_dur = |time: &Time| {
+        let Time { sec, nanosec } = *time;
+        Duration::from_nanos(sec as u64 * 1_000_000_000 + nanosec as u64)
+    };
+
+    sub.map(anyhow::Ok)
+        .try_fold(pub_, |pub_, in_msg| async move {
+            let Path { poses, header } = in_msg;
+            let Some(first_pose) = poses.get(0) else {
+                return Ok(pub_);
+            };
+            let first_stamp = time_to_dur(&first_pose.header.stamp);
+            let points: Vec<_> = poses
+                .into_iter()
+                .map(|pose| {
+                    use builtin_interfaces::msg::Duration as RosDuration;
+                    let PoseStamped { header, pose } = pose;
+                    let elapsed = time_to_dur(&header.stamp)
+                        .checked_sub(first_stamp)
+                        .unwrap_or(Duration::ZERO);
+
+                    TrajectoryPoint {
+                        time_from_start: RosDuration {
+                            sec: elapsed.as_secs() as i32,
+                            nanosec: elapsed.subsec_nanos(),
+                        },
+                        pose,
+                        ..Default::default()
+                    }
+                })
+                .collect();
+            let out_msg = Trajectory { header, points };
+
+            pub_.publish(&out_msg)?;
+
+            Ok(pub_)
+        })
+        .await?;
 
     Ok(())
 }
