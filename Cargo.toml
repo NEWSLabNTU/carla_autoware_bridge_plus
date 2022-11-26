@@ -1,0 +1,16 @@
+[package]
+name = "carla_autoware_bridge_plus"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.66"
+futures = "0.3.25"
+ndarray = "0.15.6"
+num = "0.4.0"
+num-derive = "0.3.3"
+num-traits = "0.2.15"
+r2r = { git = "https://github.com/jerry73204/r2r.git", rev = "6644562704a76b942e5bc11784240efc1dd24285" }
+tokio = { version = "1.22.0", features = ["rt-multi-thread", "macros", "sync"] }

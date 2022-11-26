@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>carla_autoware_bridge_plus</name>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="jerry73204@gmail.com">aeon</maintainer>
+  <license>TODO: License declaration</license>
+
+  <!-- <depend>builtin_interfaces</depend> -->
+  <!-- <depend>std_msgs</depend> -->
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>shape_msgs</depend>
+  <depend>autoware_auto_control_msgs</depend>
+  <depend>autoware_auto_perception_msgs</depend>
+  <depend>autoware_auto_vehicle_msgs</depend>
+  <depend>carla_msgs</depend>
+  <depend>derived_object_msgs</depend>
+  <depend>ackermann_msgs</depend>
+
+  <buildtool_depend>ament_cargo</buildtool_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cargo</build_type>
+  </export>
+</package>
