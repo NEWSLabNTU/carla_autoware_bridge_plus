@@ -12,5 +12,8 @@ ndarray = "0.15.6"
 num = "0.4.0"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
-r2r = { git = "https://github.com/jerry73204/r2r.git", rev = "6644562704a76b942e5bc11784240efc1dd24285" }
+r2r = "0.6.3"
 tokio = { version = "1.22.0", features = ["rt-multi-thread", "macros", "sync"] }
+
+[patch.crates-io]
+r2r = { git = "https://github.com/jerry73204/r2r.git", rev = "6644562704a76b942e5bc11784240efc1dd24285" }
