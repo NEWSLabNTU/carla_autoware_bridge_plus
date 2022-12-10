@@ -1,178 +1,9 @@
-use anyhow::{bail, Result};
-use futures::{Stream, StreamExt};
+use anyhow::bail;
 use num_derive::FromPrimitive;
-use r2r::{
-    ackermann_msgs::msg::AckermannDrive,
-    autoware_auto_control_msgs::msg::AckermannControlCommand,
-    autoware_auto_perception_msgs::msg::DetectedObjects,
-    autoware_auto_planning_msgs::msg::Trajectory,
-    autoware_auto_vehicle_msgs::{msg::SteeringReport, srv::ControlModeCommand},
-    carla_msgs::{
-        msg::{CarlaEgoVehicleInfo, CarlaEgoVehicleStatus, CarlaStatus, CarlaWorldInfo},
-        srv::GetBlueprints,
-    },
-    derived_object_msgs::msg::ObjectArray,
-    geometry_msgs::msg::AccelWithCovarianceStamped,
-    nav_msgs::msg::{Odometry, Path},
-    rcl_interfaces::srv::{
-        DescribeParameters, GetParameterTypes, GetParameters, ListParameters, SetParameters,
-        SetParametersAtomically,
-    },
-    tier4_external_api_msgs::srv::InitializePose,
-    Client, Context, Node, ParameterValue, Publisher, QosProfile, ServiceRequest,
-};
-use std::pin::Pin;
+use std::str::FromStr;
 
-pub type Subscriber<T> = Pin<Box<dyn Stream<Item = T>>>;
-pub type Service<T> = Pin<Box<dyn Stream<Item = ServiceRequest<T>>>>;
-
-pub(crate) struct CarlaAutowareBridge {
-    pub node: Node,
-    pub autoware_pub: AutowarePublishers,
-    pub autoware_sub: AutowareSubscribers,
-    pub carla_pub: CarlaPublishers,
-    pub carla_sub: CarlaSubscribers,
-    pub carla_sc: CarlaServiceClients,
-    pub srv: Services,
-}
-
-impl CarlaAutowareBridge {
-    pub fn new() -> Result<Self> {
-        let ctx = Context::create()?;
-        let mut node = Node::create(ctx, "carla_autoware_bridge", "/simulator")?;
-        let role_name = {
-            let params = node.params.lock().unwrap();
-            match params.get("role_name") {
-                Some(ParameterValue::String(role_name)) => role_name,
-                Some(_) => bail!("invalid parameter type"),
-                None => "ego_vehicle",
-            }
-            .to_string()
-        };
-
-        let qos = QosProfile::default();
-
-        Ok(Self {
-            autoware_pub: AutowarePublishers {
-                accel: node.create_publisher("/localization/acceleration", qos.clone())?,
-                odom: node.create_publisher("/localization/kinematic_state", qos.clone())?,
-                obj: node.create_publisher(
-                    "/perception/object_recognition/detection/objects",
-                    qos.clone(),
-                )?,
-                steer_status: node
-                    .create_publisher("/vehicle/status/steering_status", qos.clone())?,
-                trajectory: node
-                    .create_publisher("/planning/scenario_planning/trajectory", qos.clone())?,
-            },
-            autoware_sub: AutowareSubscribers {
-                control_cmd: node
-                    .subscribe("/control/command/control_cmd", qos.clone())?
-                    .boxed_local(),
-            },
-            carla_pub: CarlaPublishers {
-                ackermann: node.create_publisher(
-                    &format!("/carla/{}/ackermann_cmd", role_name),
-                    qos.clone(),
-                )?,
-            },
-            carla_sub: CarlaSubscribers {
-                status: node.subscribe("/carla/status", qos.clone())?.boxed_local(),
-                world_info: node
-                    .subscribe("/carla/world_info", qos.clone())?
-                    .boxed_local(),
-                obj: node
-                    .subscribe(&format!("/carla/{}/objects", role_name), qos.clone())?
-                    .boxed_local(),
-                odom: node
-                    .subscribe(&format!("/carla/{}/odometry", role_name), qos.clone())?
-                    .boxed_local(),
-                vehicle_status: node
-                    .subscribe(&format!("/carla/{}/vehicle_status", role_name), qos.clone())?
-                    .boxed_local(),
-                vehicle_info: node
-                    .subscribe(&format!("/carla/{}/vehicle_info", role_name), qos.clone())?
-                    .boxed_local(),
-                waypoints: node
-                    .subscribe(&format!("/carla/{}/waypoints", role_name), qos.clone())?
-                    .boxed_local(),
-            },
-            srv: Services {
-                init_pose: node
-                    .create_service("/api/simulator/set/pose")?
-                    .boxed_local(),
-                control_mode: node
-                    .create_service("/control/control_mode_request")?
-                    .boxed_local(),
-                desc_param: node
-                    .create_service("/simulation/simple_planning_simulator/describe_parameters")?
-                    .boxed_local(),
-                get_param_ty: node
-                    .create_service("/simulation/simple_planning_simulator/get_parameter_types")?
-                    .boxed_local(),
-                get_param: node
-                    .create_service("/simulation/simple_planning_simulator/get_parameters")?
-                    .boxed_local(),
-                list_param: node
-                    .create_service("/simulation/simple_planning_simulator/list_parameters")?
-                    .boxed_local(),
-                set_param: node
-                    .create_service("/simulation/simple_planning_simulator/set_parameters")?
-                    .boxed_local(),
-                set_param_atomic: node
-                    .create_service(
-                        "/simulation/simple_planning_simulator/set_parameters_atomically",
-                    )?
-                    .boxed_local(),
-            },
-            carla_sc: CarlaServiceClients {
-                get_blueprints: node.create_client("/carla/get_blueprints")?,
-            },
-            node,
-        })
-    }
-}
-
-pub(crate) struct AutowarePublishers {
-    pub accel: Publisher<AccelWithCovarianceStamped>,
-    pub odom: Publisher<Odometry>,
-    pub obj: Publisher<DetectedObjects>,
-    pub steer_status: Publisher<SteeringReport>,
-    pub trajectory: Publisher<Trajectory>,
-}
-
-pub(crate) struct AutowareSubscribers {
-    pub control_cmd: Subscriber<AckermannControlCommand>,
-}
-
-pub(crate) struct CarlaPublishers {
-    pub ackermann: Publisher<AckermannDrive>,
-}
-
-pub(crate) struct CarlaSubscribers {
-    pub status: Subscriber<CarlaStatus>,
-    pub world_info: Subscriber<CarlaWorldInfo>,
-    pub obj: Subscriber<ObjectArray>,
-    pub odom: Subscriber<Odometry>,
-    pub vehicle_status: Subscriber<CarlaEgoVehicleStatus>,
-    pub vehicle_info: Subscriber<CarlaEgoVehicleInfo>,
-    pub waypoints: Subscriber<Path>,
-}
-
-pub(crate) struct CarlaServiceClients {
-    pub get_blueprints: Client<GetBlueprints::Service>,
-}
-
-pub(crate) struct Services {
-    pub init_pose: Service<InitializePose::Service>,
-    pub control_mode: Service<ControlModeCommand::Service>,
-    pub desc_param: Service<DescribeParameters::Service>,
-    pub get_param_ty: Service<GetParameterTypes::Service>,
-    pub get_param: Service<GetParameters::Service>,
-    pub list_param: Service<ListParameters::Service>,
-    pub set_param: Service<SetParameters::Service>,
-    pub set_param_atomic: Service<SetParametersAtomically::Service>,
-}
+// pub type Subscriber<T> = Pin<Box<dyn Stream<Item = T>>>;
+// pub type Service<T> = Pin<Box<dyn Stream<Item = ServiceRequest<T>>>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 #[allow(non_camel_case_types)]
@@ -223,4 +54,75 @@ pub enum AutowareShapeType {
     BOUNDING_BOX = 0,
     CYLINDER = 1,
     POLYGON = 2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+pub enum PointFieldType {
+    INT8 = 1,
+    UINT8 = 2,
+    INT16 = 3,
+    UINT16 = 4,
+    INT32 = 5,
+    UINT32 = 6,
+    FLOAT32 = 7,
+    FLOAT64 = 8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SensorType {
+    CameraRgb,
+    LidarRayCast,
+    LidarRayCastSemantic,
+    Imu,
+    Collision,
+}
+
+impl FromStr for SensorType {
+    type Err = anyhow::Error;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Ok(match text {
+            "sensor.camera.rgb" => Self::CameraRgb,
+            "sensor.lidar.ray_cast" => Self::LidarRayCast,
+            "sensor.lidar.ray_cast_semantic" => Self::LidarRayCastSemantic,
+            "sensor.other.imu" => Self::Imu,
+            "sensor.other.collision" => Self::Collision,
+            _ => bail!("Unsupported type '{}'", text),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+pub enum TrafficLightColor {
+    RED = 1,
+    AMBER = 2,
+    GREEN = 3,
+    WHITE = 4,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+pub enum TrafficLightShape {
+    CIRCLE = 5,
+    LEFT_ARROW = 6,
+    RIGHT_ARROW = 7,
+    UP_ARROW = 8,
+    DOWN_ARROW = 9,
+    DOWN_LEFT_ARROW = 10,
+    DOWN_RIGHT_ARROW = 11,
+    CROSS = 12,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+pub enum TrafficLightStatus {
+    SOLID_OFF = 13,
+    SOLID_ON = 14,
+    FLASHING = 15,
 }
