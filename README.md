@@ -48,6 +48,12 @@ The bridge can be brought up using either `ros2` or `cargo run`. Using
 `ros2` is standard way to bring up a ROS node. For developers, it's
 recommended to use `cargo run`.
 
+Always remember to source generated `setup.sh`.
+
+```bash
+source repo/install/setup.sh
+```
+
 ### Run Bridge using `ros2`
 
 
