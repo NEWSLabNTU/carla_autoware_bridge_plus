@@ -6,7 +6,6 @@ use r2r::{
     builtin_interfaces::msg::Time, moveit_msgs::msg::OrientedBoundingBox, Node, Publisher,
     QosProfile,
 };
-use std::ops::RangeFrom;
 
 pub fn new(node: &mut Node, actor: TrafficSign) -> Result<(TrafficSignPub, TrafficSignSub)> {
     let actor_id = actor.id();
@@ -15,7 +14,6 @@ pub fn new(node: &mut Node, actor: TrafficSign) -> Result<(TrafficSignPub, Traff
     let odom_pub = OdomPub::new(node, actor.clone(), &prefix)?;
     let trigger_volume_pub = node.create_publisher(&format!("{prefix}/trigger_volume"), qos)?;
     let pub_ = TrafficSignPub {
-        frame_counter: 0..,
         odom_pub,
         trigger_volume_pub,
         actor,
@@ -26,19 +24,17 @@ pub fn new(node: &mut Node, actor: TrafficSign) -> Result<(TrafficSignPub, Traff
 
 pub struct TrafficSignPub {
     actor: TrafficSign,
-    frame_counter: RangeFrom<usize>,
     odom_pub: OdomPub<TrafficSign>,
     trigger_volume_pub: Publisher<OrientedBoundingBox>,
 }
 
 impl TrafficSignPub {
     pub fn poll(&mut self, time: &Time) -> Result<()> {
-        let frame_id = self.frame_counter.next().unwrap();
         let bbox = self.actor.trigger_volume();
         let bbox_msg = bbox.to_ros_type();
 
         self.trigger_volume_pub.publish(&bbox_msg)?;
-        self.odom_pub.poll(time, frame_id)?;
+        self.odom_pub.poll(time)?;
         Ok(())
     }
 }

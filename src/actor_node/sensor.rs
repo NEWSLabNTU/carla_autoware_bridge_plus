@@ -20,7 +20,7 @@ use r2r::{
     std_msgs::msg::{Header, String as RosString},
     Clock, ClockType, Node, Publisher, QosProfile,
 };
-use std::{mem, ops::RangeFrom};
+use std::mem;
 
 pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
     let actor_id = actor.id();
@@ -33,15 +33,13 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
 
         let qos = QosProfile::default();
         let mut clock = Clock::create(ClockType::RosTime)?;
-        let mut frame_counter = 0..;
 
         let mut next_header = move || {
-            let frame_id = frame_counter.next().unwrap();
             let time = clock.get_now()?;
             let time = Clock::to_builtin_time(&time);
             let header = Header {
                 stamp: time,
-                frame_id: frame_id.to_string(),
+                frame_id: "".to_string(),
             };
             anyhow::Ok(header)
         };
@@ -100,7 +98,6 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
     let type_pub = node.create_publisher(&format!("{prefix}/type"), qos)?;
     let odom_pub = OdomPub::new(node, actor, &prefix)?;
     let pub_ = SensorPub {
-        frame_counter: 0..,
         type_id,
         type_pub,
         odom_pub,
@@ -110,7 +107,6 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
 }
 
 pub struct SensorPub {
-    frame_counter: RangeFrom<usize>,
     type_id: String,
     type_pub: Publisher<RosString>,
     odom_pub: OdomPub<Sensor>,
@@ -118,12 +114,11 @@ pub struct SensorPub {
 
 impl SensorPub {
     pub fn poll(&mut self, time: &Time) -> Result<()> {
-        let frame_id = self.frame_counter.next().unwrap();
         let type_msg = RosString {
             data: self.type_id.to_string(),
         };
         self.type_pub.publish(&type_msg)?;
-        self.odom_pub.poll(time, frame_id)?;
+        self.odom_pub.poll(time)?;
         Ok(())
     }
 }

@@ -29,8 +29,8 @@ where
         })
     }
 
-    pub fn poll(&mut self, time: &Time, frame_id: usize) -> Result<ActorPhysics> {
-        let physics = self.actor.create_physics_msg(time.clone(), frame_id);
+    pub fn poll(&mut self, time: &Time) -> Result<ActorPhysics> {
+        let physics = self.actor.create_physics_msg(time.clone());
         let ActorPhysics {
             odom_msg,
             accel_msg,

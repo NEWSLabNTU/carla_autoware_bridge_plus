@@ -22,20 +22,19 @@ pub struct ActorPhysics {
 }
 
 pub trait ActorExt: ActorBase {
-    fn create_physics_msg(&self, time: Time, frame_id: usize) -> ActorPhysics {
+    fn create_physics_msg(&self, time: Time) -> ActorPhysics {
         let transform = self.transform();
         let velocity = self.velocity();
         let angular_velocity = self.angular_velocity();
         let accel = self.acceleration();
 
-        let frame_id = frame_id.to_string();
         let header = Header {
             stamp: time,
-            frame_id: frame_id.clone(),
+            frame_id: "".to_string(),
         };
         let odom_msg = Odometry {
             header: header.clone(),
-            child_frame_id: frame_id,
+            child_frame_id: "".to_string(),
             pose: transform.to_ros_type(),
             twist: TwistWithCovariance {
                 twist: Twist {

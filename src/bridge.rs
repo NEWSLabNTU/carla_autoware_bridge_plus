@@ -10,7 +10,7 @@ impl Bridge {
         let qos = QosProfile::default();
 
         Ok(Self {
-            tick: node.create_publisher("tick", qos.clone())?,
+            tick: node.create_publisher("tick", qos)?,
         })
     }
 }

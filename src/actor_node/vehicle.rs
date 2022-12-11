@@ -12,7 +12,7 @@ use r2r::{
     carla_msgs::msg::{CarlaEgoVehicleControl, CarlaEgoVehicleInfo, CarlaEgoVehicleInfoWheel},
     Node, Publisher, QosProfile,
 };
-use std::{future::IntoFuture, ops::RangeFrom};
+use std::future::IntoFuture;
 // use tokio::sync::watch;
 
 pub fn new(node: &mut Node, actor: Vehicle) -> Result<(VehiclePub, VehicleSub)> {
@@ -35,7 +35,6 @@ pub fn new(node: &mut Node, actor: Vehicle) -> Result<(VehiclePub, VehicleSub)> 
     );
 
     let pub_ = VehiclePub {
-        frame_counter: 0..,
         actor,
         role_name,
         // shared_tx,
@@ -50,7 +49,6 @@ pub fn new(node: &mut Node, actor: Vehicle) -> Result<(VehiclePub, VehicleSub)> 
 }
 
 pub struct VehiclePub {
-    frame_counter: RangeFrom<usize>,
     actor: Vehicle,
     role_name: String,
     // shared_tx: watch::Sender<Option<Shared>>,
@@ -73,7 +71,6 @@ impl IntoFuture for VehicleSub {
 
 impl VehiclePub {
     pub fn poll(&mut self, time: &Time) -> Result<()> {
-        let frame_id = self.frame_counter.next().unwrap();
         let VehiclePhysicsControl {
             max_rpm,
             moi,
@@ -133,7 +130,7 @@ impl VehiclePub {
             center_of_mass: center_of_mass.vector.to_ros_type(),
         };
 
-        self.odom_pub.poll(time, frame_id)?;
+        self.odom_pub.poll(time)?;
         self.vehicle_info_pub.publish(&vehicle_info_msg)?;
 
         // let transform = self.actor.transform();

@@ -15,7 +15,6 @@ use r2r::{
     std_msgs::msg::Header,
     Node, Publisher, QosProfile,
 };
-use std::ops::RangeFrom;
 
 pub fn new(
     node: &mut Node,
@@ -28,7 +27,6 @@ pub fn new(
     let trigger_volume_pub = node.create_publisher(&format!("{prefix}/trigger_volume"), qos)?;
     let odom_pub = OdomPub::new(node, actor.clone(), &prefix)?;
     let pub_ = TrafficLightPub {
-        frame_counter: 0..,
         actor,
         odom_pub,
         status_pub,
@@ -40,7 +38,6 @@ pub fn new(
 
 pub struct TrafficLightPub {
     actor: TrafficLightActor,
-    frame_counter: RangeFrom<usize>,
     odom_pub: OdomPub<TrafficLightActor>,
     status_pub: Publisher<TrafficSignalStamped>,
     trigger_volume_pub: Publisher<OrientedBoundingBox>,
@@ -48,7 +45,6 @@ pub struct TrafficLightPub {
 
 impl TrafficLightPub {
     pub fn poll(&mut self, time: &Time) -> Result<()> {
-        let frame_id = self.frame_counter.next().unwrap();
         let bbox = self.actor.trigger_volume();
         let (rbit, ybit, gbit) = match self.actor.state() {
             TrafficLightState::Red => (true, false, false),
@@ -70,7 +66,7 @@ impl TrafficLightPub {
 
         let header = Header {
             stamp: time.clone(),
-            frame_id: frame_id.to_string(),
+            frame_id: "".to_string(),
         };
         let status_msg = TrafficSignalStamped {
             header,
@@ -100,7 +96,7 @@ impl TrafficLightPub {
         };
         let bbox_msg = bbox.to_ros_type();
 
-        self.odom_pub.poll(time, frame_id)?;
+        self.odom_pub.poll(time)?;
         self.status_pub.publish(&status_msg)?;
         self.trigger_volume_pub.publish(&bbox_msg)?;
 
