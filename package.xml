@@ -7,18 +7,35 @@
   <maintainer email="jerry73204@gmail.com">aeon</maintainer>
   <license>TODO: License declaration</license>
 
-  <!-- <depend>builtin_interfaces</depend> -->
-  <!-- <depend>std_msgs</depend> -->
+  <depend>builtin_interfaces</depend>
+  <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>shape_msgs</depend>
-  <depend>autoware_auto_control_msgs</depend>
-  <depend>autoware_auto_perception_msgs</depend>
-  <depend>autoware_auto_vehicle_msgs</depend>
   <depend>carla_msgs</depend>
-  <!-- <depend>derived_object_msgs</depend> -->
-  <depend>ackermann_msgs</depend>
   <depend>moveit_msgs</depend>
+  <depend>autoware_auto_perception_msgs</depend>
+  <depend>autoware_auto_mapping_msgs</depend>
+  <!-- <depend>autoware_common_msgs</depend> -->
+  <!-- <depend>autoware_control_msgs</depend> -->
+  <!-- <depend>autoware_localization_msgs</depend> -->
+  <depend>autoware_map_msgs</depend>
+  <!-- <depend>autoware_planning_msgs</depend> -->
+  <!-- <depend>autoware_sensing_msgs</depend> -->
+  <!-- <depend>tier4_api_msgs</depend> -->
+  <!-- <depend>tier4_control_msgs</depend> -->
+  <!-- <depend>tier4_debug_msgs</depend> -->
+  <!-- <depend>tier4_external_api_msgs</depend> -->
+  <!-- <depend>tier4_hmi_msgs</depend> -->
+  <!-- <depend>tier4_localization_msgs</depend> -->
+  <!-- <depend>tier4_perception_msgs</depend> -->
+  <!-- <depend>tier4_planning_msgs</depend> -->
+  <!-- <depend>tier4_rtc_msgs</depend> -->
+  <!-- <depend>tier4_simulation_msgs</depend> -->
+  <!-- <depend>tier4_system_msgs</depend> -->
+  <!-- <depend>tier4_v2x_msgs</depend> -->
+  <!-- <depend>derived_object_msgs</depend> -->
+  <!-- <depend>ackermann_msgs</depend> -->
 
   <buildtool_depend>ament_cargo</buildtool_depend>
 
