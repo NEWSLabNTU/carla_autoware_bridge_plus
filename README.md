@@ -1,8 +1,7 @@
 # CARLA-Autoware Bridge Plus
 
-A ROS 2 bridge that forwards topics from CARLA simualtor's
-[ros_bridge](https://github.com/carla-simulator/ros-bridge) to
-Autoware and vice versa.
+The bridge exposes Carla simulator parameters and object entities to
+ROS 2 topics in Autoware message types.
 
 This repository is still in alpha stage. Great refactoring is
 expected.
