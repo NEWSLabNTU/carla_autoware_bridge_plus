@@ -15,7 +15,7 @@
   <depend>autoware_auto_control_msgs</depend>
   <depend>autoware_auto_perception_msgs</depend>
   <depend>autoware_auto_vehicle_msgs</depend>
-  <!-- <depend>carla_msgs</depend> -->
+  <depend>carla_msgs</depend>
   <!-- <depend>derived_object_msgs</depend> -->
   <depend>ackermann_msgs</depend>
   <depend>moveit_msgs</depend>
