@@ -67,6 +67,24 @@ cd repo/src/carla_autoware_bridge_plus/
 cargo run
 ```
 
+## Node Parameters
+
+The node have the following parameters.
+
+- `carla_host`
+
+  Sets the Carla server address the bridge connects to. The default is
+  "127.0.0.1".
+
+- `carla_host`
+
+  Sets the Carla server port. The default is 2000.
+
+- `carla_timeout_millis`
+
+  Sets the Carla client connection timeout in milliseconds. The
+  default is 20000.
+
 ## License
 
 This project is licensed under MIT license. Please check [the license
