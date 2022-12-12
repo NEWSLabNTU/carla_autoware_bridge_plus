@@ -1,16 +1,16 @@
 mod actor_node;
 mod bridge;
 mod map_srv;
+mod params;
 mod types;
 mod utils;
-// mod params;
 // mod control_physics;
 
 use anyhow::Result;
 use bridge::Bridge;
 use carla::{client::Client, prelude::*, rpc::ActorId};
-use clap::Parser;
 use futures::{future::BoxFuture, join, select, stream::FuturesUnordered, FutureExt, StreamExt};
+use params::Params;
 use r2r::{log_info, std_msgs::msg::Empty, Clock, ClockType, Context, Node};
 use std::{
     collections::{HashMap, HashSet},
@@ -19,34 +19,23 @@ use std::{
 };
 use tokio::task::spawn_blocking;
 
-#[derive(Parser)]
-struct Opts {
-    #[clap(long, default_value = "/carla")]
-    pub namespace: String,
-    #[clap(long, default_value = "127.0.0.1")]
-    pub carla_host: String,
-    #[clap(long, default_value = "2000")]
-    pub carla_port: u16,
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    let Opts {
-        namespace,
-        carla_host,
-        carla_port,
-    } = Opts::parse();
-
     // Create channels
     let (future_tx, future_rx) = flume::bounded(4);
 
     // Construct publishers, subscribers and services, etc.
     let ctx = Context::create()?;
-    let mut node = Node::create(ctx, "carla_autoware_bridge", &namespace)?;
+    let mut node = Node::create(ctx, "carla_autoware_bridge", "/carla")?;
+    let Params {
+        carla_host,
+        carla_port,
+        carla_timeout_millis,
+    } = Params::load(&node)?;
 
     // Create Carla client
     let mut client = Client::connect(&carla_host, carla_port, None);
-    client.set_timeout(Duration::from_millis(5000));
+    client.set_timeout(Duration::from_millis(carla_timeout_millis));
 
     let map_srv = map_srv::new(&mut node, client.world())?.map(|result| result.unwrap());
 
