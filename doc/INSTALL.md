@@ -40,7 +40,7 @@ vcs import src < autoware.repos
 vcs pull src < autoware.repos
 ```
 
-## Build the Repository
+## Repository Preparation
 
 Prepare a ROS repository including this bridge, Autoware and Carla's ros-bridge.
 
@@ -52,6 +52,27 @@ repo/
     └── autoware/ (https://github.com/autowarefoundation/autoware.git galactic branch)
 ```
 
+The `ros-bridge` has git submodules. Remember to update them.
+
+```bash
+cd repo/src/ros-bridge
+git submodule init
+git submodule update --recursive
+```
+
+The `autoware` tracks underlying dependencies using `vcs`. Please
+update the dependencies this way.
+
+```bash
+cd repo/src/autoware
+git checkout galactic  # Use Galactic branch
+
+mkdir -p src
+vcs import src < autoware.repos
+vcs pull src < autoware.repos
+```
+
+## Build the Repository
 
 Build the whole repository inside the repo/ directory.
 
