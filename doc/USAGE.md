@@ -44,9 +44,19 @@ ros2 run carla_autoware_bridge_plus carla_autoware_bridge_plus \
 
 ## Run Using `cargo run` (for Developers)
 
+To run with default settings,
+
 ```bash
 cd repo/src/carla_autoware_bridge_plus/
 cargo run
+```
+
+Add `--release` and it compiles optimized binaries (up to 5x
+faster). It takes longer compilation time.
+
+```bash
+cd repo/src/carla_autoware_bridge_plus/
+cargo run --release
 ```
 
 To pass custom address and port parameters,
@@ -57,6 +67,25 @@ cargo run -- \
     -p carla_host:=127.0.0.1 \
     -p carla_port:=2000
 ```
+
+To pass custom parameters and use optimized compilation,
+
+```bash
+cargo run --release -- \
+    --ros-args \
+    -p carla_host:=127.0.0.1 \
+    -p carla_port:=2000
+```
+
+You can obtain the compiled binaries in the `target/` directory. The
+binaries are mostly statically linked. It's OK to run these binaries
+directly as long as `setup.sh` was sourced.
+
+```
+target/debug/carla_autoware_bridge_plus    # for `cargo run`
+target/release/carla_autoware_bridge_plus  # for `cargo run --release`
+```
+
 
 ## Node Parameters
 
