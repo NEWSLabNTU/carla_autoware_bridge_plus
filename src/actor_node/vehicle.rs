@@ -1,5 +1,5 @@
 use super::odom::OdomPub;
-use crate::utils::ToRosType;
+use crate::{qos, utils::ToRosType};
 use anyhow::{anyhow, Result};
 use carla::{
     client::{ActorBase, Vehicle},
@@ -10,9 +10,10 @@ use futures::{future::BoxFuture, FutureExt, Stream, StreamExt};
 use r2r::{
     builtin_interfaces::msg::Time,
     carla_msgs::msg::{CarlaEgoVehicleControl, CarlaEgoVehicleInfo, CarlaEgoVehicleInfoWheel},
-    Node, Publisher, QosProfile,
+    Node, Publisher,
 };
 use std::future::IntoFuture;
+use tokio::spawn;
 // use tokio::sync::watch;
 
 pub fn new(node: &mut Node, actor: Vehicle) -> Result<(VehiclePub, VehicleSub)> {
@@ -22,17 +23,18 @@ pub fn new(node: &mut Node, actor: Vehicle) -> Result<(VehiclePub, VehicleSub)> 
         .find(|attr| attr.id() == "role_name")
         .ok_or_else(|| anyhow!("The actor does not have a 'role_name' attribute"))?
         .value_string();
-    let qos = QosProfile::default();
     // let (shared_tx, shared_rx) = watch::channel(None);
 
     let prefix = format!("vehicle/{role_name}");
-    let vehicle_info_pub = node.create_publisher(&format!("{prefix}/vehicle_info"), qos.clone())?;
+    let vehicle_info_pub =
+        node.create_publisher(&format!("{prefix}/vehicle_info"), qos::best_effort())?;
     let odom_pub = OdomPub::new(node, actor.clone(), &prefix)?;
-    let acker_sub = node.subscribe(&format!("{prefix}/control_cmd"), qos)?;
-    let forward_ackermann = forward_control_cmd(
+    let acker_sub = node.subscribe(&format!("{prefix}/control_cmd"), qos::best_effort())?;
+    let forward_ackermann = spawn(forward_control_cmd(
         acker_sub,
         actor.clone(), // shared_rx
-    );
+    ))
+    .map(|result| result.unwrap());
 
     let pub_ = VehiclePub {
         actor,

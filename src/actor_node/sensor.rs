@@ -1,5 +1,6 @@
 use super::odom::OdomPub;
 use crate::{
+    qos,
     types::{PointFieldType, SensorType},
     utils::{identity_matrix, ToRosType},
 };
@@ -18,7 +19,7 @@ use r2r::{
     log_warn,
     sensor_msgs::msg::{Image as RosImage, Imu, PointCloud2, PointField},
     std_msgs::msg::{Header, String as RosString},
-    Clock, ClockType, Node, Publisher, QosProfile,
+    Clock, ClockType, Node, Publisher,
 };
 use std::mem;
 
@@ -31,7 +32,6 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
     if let Some(type_) = type_ {
         use SensorType as T;
 
-        let qos = QosProfile::default();
         let mut clock = Clock::create(ClockType::RosTime)?;
 
         let mut next_header = move || {
@@ -46,7 +46,8 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
 
         match type_ {
             T::CameraRgb => {
-                let mut pub_ = node.create_publisher(&format!("{prefix}/image"), qos)?;
+                let mut pub_ =
+                    node.create_publisher(&format!("{prefix}/image"), qos::best_effort())?;
 
                 actor.listen(move |data| {
                     let header = next_header().unwrap();
@@ -54,7 +55,8 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
                 });
             }
             T::LidarRayCast => {
-                let mut pub_ = node.create_publisher(&format!("{prefix}/pointcloud"), qos)?;
+                let mut pub_ =
+                    node.create_publisher(&format!("{prefix}/pointcloud"), qos::best_effort())?;
 
                 actor.listen(move |data| {
                     let header = next_header().unwrap();
@@ -62,8 +64,10 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
                 });
             }
             T::LidarRayCastSemantic => {
-                let mut pub_ =
-                    node.create_publisher(&format!("{prefix}/semantic_pointcloud"), qos)?;
+                let mut pub_ = node.create_publisher(
+                    &format!("{prefix}/semantic_pointcloud"),
+                    qos::best_effort(),
+                )?;
 
                 actor.listen(move |data| {
                     let header = next_header().unwrap();
@@ -71,7 +75,8 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
                 });
             }
             T::Imu => {
-                let mut pub_ = node.create_publisher(&format!("{prefix}/imu"), qos)?;
+                let mut pub_ =
+                    node.create_publisher(&format!("{prefix}/imu"), qos::best_effort())?;
 
                 actor.listen(move |data| {
                     let header = next_header().unwrap();
@@ -79,7 +84,8 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
                 });
             }
             T::Collision => {
-                let mut pub_ = node.create_publisher(&format!("{prefix}/event"), qos)?;
+                let mut pub_ =
+                    node.create_publisher(&format!("{prefix}/event"), qos::best_effort())?;
                 actor.listen(move |data| {
                     let header = next_header().unwrap();
                     collision_callback(header, data.try_into().unwrap(), &mut pub_);
@@ -94,8 +100,7 @@ pub fn new(node: &mut Node, actor: Sensor) -> Result<(SensorPub, SensorSub)> {
         );
     }
 
-    let qos = QosProfile::default();
-    let type_pub = node.create_publisher(&format!("{prefix}/type"), qos)?;
+    let type_pub = node.create_publisher(&format!("{prefix}/type"), qos::best_effort())?;
     let odom_pub = OdomPub::new(node, actor, &prefix)?;
     let pub_ = SensorPub {
         type_id,

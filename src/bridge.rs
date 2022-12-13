@@ -1,5 +1,6 @@
+use crate::qos;
 use anyhow::Result;
-use r2r::{std_msgs::msg::Empty, Node, Publisher, QosProfile};
+use r2r::{std_msgs::msg::Empty, Node, Publisher};
 
 pub struct Bridge {
     pub tick: Publisher<Empty>,
@@ -7,10 +8,8 @@ pub struct Bridge {
 
 impl Bridge {
     pub fn new(node: &mut Node) -> Result<Self> {
-        let qos = QosProfile::default();
-
         Ok(Self {
-            tick: node.create_publisher("tick", qos)?,
+            tick: node.create_publisher("tick", qos::best_effort())?,
         })
     }
 }

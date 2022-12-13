@@ -1,5 +1,6 @@
 use super::odom::OdomPub;
 use crate::{
+    qos,
     types::{TrafficLightColor, TrafficLightShape, TrafficLightStatus},
     utils::ToRosType,
 };
@@ -13,7 +14,7 @@ use r2r::{
     builtin_interfaces::msg::Time,
     moveit_msgs::msg::OrientedBoundingBox,
     std_msgs::msg::Header,
-    Node, Publisher, QosProfile,
+    Node, Publisher,
 };
 
 pub fn new(
@@ -22,9 +23,9 @@ pub fn new(
 ) -> Result<(TrafficLightPub, TrafficLightSub)> {
     let actor_id = actor.id();
     let prefix = format!("traffic_light/id_{actor_id}");
-    let qos = QosProfile::default();
-    let status_pub = node.create_publisher(&format!("{prefix}/status"), qos.clone())?;
-    let trigger_volume_pub = node.create_publisher(&format!("{prefix}/trigger_volume"), qos)?;
+    let status_pub = node.create_publisher(&format!("{prefix}/status"), qos::best_effort())?;
+    let trigger_volume_pub =
+        node.create_publisher(&format!("{prefix}/trigger_volume"), qos::best_effort())?;
     let odom_pub = OdomPub::new(node, actor.clone(), &prefix)?;
     let pub_ = TrafficLightPub {
         actor,

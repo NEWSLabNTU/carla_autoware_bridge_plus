@@ -1,9 +1,12 @@
-use crate::utils::{ActorExt, ActorPhysics};
+use crate::{
+    qos,
+    utils::{ActorExt, ActorPhysics},
+};
 use anyhow::Result;
 use carla::client::ActorBase;
 use r2r::{
     builtin_interfaces::msg::Time, geometry_msgs::msg::AccelWithCovarianceStamped,
-    nav_msgs::msg::Odometry, Node, Publisher, QosProfile,
+    nav_msgs::msg::Odometry, Node, Publisher,
 };
 
 pub struct OdomPub<T>
@@ -20,12 +23,10 @@ where
     T: ActorBase,
 {
     pub fn new(node: &mut Node, actor: T, prefix: &str) -> Result<Self> {
-        let qos = QosProfile::default();
-
         Ok(OdomPub {
             actor,
-            accel: node.create_publisher(&format!("{prefix}/acceleration"), qos.clone())?,
-            odom: node.create_publisher(&format!("{prefix}/odometry"), qos)?,
+            accel: node.create_publisher(&format!("{prefix}/acceleration"), qos::best_effort())?,
+            odom: node.create_publisher(&format!("{prefix}/odometry"), qos::best_effort())?,
         })
     }
 

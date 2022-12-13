@@ -2,6 +2,7 @@ mod actor_node;
 mod bridge;
 mod map_srv;
 mod params;
+mod qos;
 mod types;
 mod utils;
 // mod control_physics;
