@@ -17,6 +17,20 @@ cargo install --git https://github.com/jerry73204/cargo-ament-build.git
 pip3 install git+https://github.com/jerry73204/colcon-ros-cargo.git@merge-colcon-cargo
 ```
 
+## Install Dependencies
+
+This package runs on ROS Galactic. It will be upgraded to ROS Humble
+in the future as Autoware drops support for Galactic since
+Dec, 2022. For the time being, Galactic versions of Ubuntu and
+Autoware are used.
+
+Install an extra dependency:
+
+
+```bash
+sudo apt install ros-galactic-moveit-msgs
+```
+
 ## Build
 
 Prepare a ROS repository including this bridge, Autoware and Carla's ros-bridge.
