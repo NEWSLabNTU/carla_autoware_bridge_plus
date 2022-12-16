@@ -361,7 +361,7 @@ fn looper(
     let bridge = Bridge::new(&mut node)?;
     let mut clock = Clock::create(ClockType::RosTime)?;
 
-    loop {
+    'tick: loop {
         node.spin_once(Duration::from_millis(10));
         world.wait_for_tick();
 
@@ -394,7 +394,7 @@ fn looper(
 
                 let result = future_tx.send(sub.into_future());
                 if result.is_err() {
-                    break;
+                    break 'tick;
                 }
             }
 
@@ -414,4 +414,6 @@ fn looper(
         // Publish tick
         bridge.tick.publish(&Empty {})?;
     }
+
+    Ok(())
 }
