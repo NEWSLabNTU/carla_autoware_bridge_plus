@@ -1,8 +1,9 @@
-use anyhow::{ensure, Result};
+use anyhow::{bail, Context, Result};
 use carla::client::World;
 use futures::{Future, Stream, StreamExt};
 use r2r::{
     autoware_auto_mapping_msgs::{msg::HADMapBin, srv::HADMapService},
+    log_error,
     std_msgs::msg::Header,
     Clock, ClockType, Node, ServiceRequest,
 };
@@ -10,8 +11,10 @@ use std::{
     fs,
     path::PathBuf,
     process::{Command, Output},
+    time::Duration,
 };
 use tempfile::TempDir;
+use tokio::time::sleep;
 
 pub fn new(node: &mut Node, world: World) -> Result<impl Future<Output = Result<()>>> {
     let stream = node.create_service::<HADMapService::Service>("map")?;
@@ -36,6 +39,18 @@ impl MapConverter {
     }
 
     pub fn opendrive_to_lanelet2(&self, opendrive: &str) -> Result<Vec<u8>> {
+        let err = |stderr| {
+            format!(
+                "`opendrive2lanelet-convert -f {}` failed.\
+                 Please make sure opendrive2lanelet is installed. Try this:\
+                 pip install https://github.com/usdot-fhwa-stol/opendrive2lanelet/archive/develop.zip\
+                 ---- stderr ----\
+                 {}",
+                &self.input_path.display(),
+                stderr
+            )
+        };
+
         fs::write(&self.input_path, opendrive)?;
         let Output {
             status,
@@ -44,21 +59,12 @@ impl MapConverter {
         } = Command::new("opendrive2lanelet-convert")
             .arg("-f")
             .arg(&self.input_path)
-            .output()?;
+            .output()
+            .with_context(|| err(""))?;
 
-        let command_line = || {
-            format!(
-                "opendrive2lanelet-convert -f {}",
-                &self.input_path.display()
-            )
-        };
-
-        ensure!(
-            status.success(),
-            "Unable to run '{}':\n{}",
-            command_line(),
-            String::from_utf8_lossy(&stderr)
-        );
+        if !status.success() {
+            bail!("{}", err(&String::from_utf8_lossy(&stderr)));
+        }
 
         let _ = fs::remove_file(&self.input_path);
 
@@ -106,10 +112,28 @@ async fn run_service(
     world: World,
 ) -> Result<()> {
     let mut clock = Clock::create(ClockType::RosTime)?;
-    let mut cache = Cache::new(world)?;
+    let mut cache = loop {
+        let result = Cache::new(world.clone()).with_context(|| "Unable to publish world map.");
+
+        match result {
+            Ok(cache) => break cache,
+            Err(err) => {
+                log_error!(env!("CARGO_BIN_NAME"), "{:?}", err);
+                sleep(Duration::from_secs(1)).await;
+            }
+        }
+    };
 
     while let Some(req) = stream.next().await {
         let time = Clock::to_builtin_time(&clock.get_now()?);
+        let data = match cache.get().with_context(|| "Unable to publish world map") {
+            Ok(data) => data,
+            Err(err) => {
+                log_error!(env!("CARGO_BIN_NAME"), "{:?}", err);
+                continue;
+            }
+        };
+
         let resp = HADMapService::Response {
             map: HADMapBin {
                 header: Header {
@@ -119,7 +143,7 @@ async fn run_service(
                 map_format: 0,
                 format_version: "".to_string(),
                 map_version: "".to_string(),
-                data: cache.get()?.to_vec(),
+                data: data.to_vec(),
             },
             answer: 0,
         };

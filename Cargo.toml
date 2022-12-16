@@ -20,7 +20,7 @@ num-traits = "0.2.15"
 pid = "3.0.0"
 r2r = "0.6.3"
 tempfile = "3.3.0"
-tokio = { version = "1.22.0", features = ["rt-multi-thread", "macros", "sync"] }
+tokio = { version = "1.22.0", features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 [patch.crates-io]
 r2r = { git = "https://github.com/jerry73204/r2r.git", rev = "6644562704a76b942e5bc11784240efc1dd24285" }
