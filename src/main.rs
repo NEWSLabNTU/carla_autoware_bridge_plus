@@ -7,10 +7,16 @@ mod types;
 mod utils;
 // mod control_physics;
 
+use actor_node::generic::{ActorPub, ActorSub};
 use anyhow::Result;
 use bridge::Bridge;
-use carla::{client::Client, prelude::*, rpc::ActorId};
+use carla::{
+    client::{Client, World},
+    prelude::*,
+    rpc::ActorId,
+};
 use futures::{future::BoxFuture, join, select, stream::FuturesUnordered, FutureExt, StreamExt};
+use itertools::Itertools;
 use params::Params;
 use r2r::{log_info, std_msgs::msg::Empty, Clock, ClockType, Context, Node};
 use std::{
@@ -18,7 +24,7 @@ use std::{
     future::IntoFuture,
     time::Duration,
 };
-use tokio::task::spawn_blocking;
+use tokio::{spawn, task::spawn_blocking};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -54,6 +60,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+/// Consumes and awaits generated tasks in runtime.
 async fn waiter(future_rx: flume::Receiver<BoxFuture<'static, ()>>) {
     let mut futures = FuturesUnordered::new();
 
@@ -75,6 +82,97 @@ async fn waiter(future_rx: flume::Receiver<BoxFuture<'static, ()>>) {
             }
         }
     }
+}
+
+/// Spins ROS onde and waits for simulation ticks in a loop.
+fn looper(
+    mut node: Node,
+    client: Client,
+    future_tx: flume::Sender<BoxFuture<'static, ()>>,
+) -> Result<()> {
+    let world = client.world();
+
+    let mut publishers: HashMap<ActorId, _> = HashMap::new();
+    let bridge = Bridge::new(&mut node)?;
+    let mut clock = Clock::create(ClockType::RosTime)?;
+
+    loop {
+        node.spin_once(Duration::from_millis(10));
+        world.wait_for_tick();
+
+        // Update actors
+        let new_subs = update_actors(&mut node, &world, &mut publishers)?;
+        let is_all_sent = new_subs.into_iter().all(|sub| {
+            let future = spawn(sub.into_future())
+                .map(|result| result.unwrap())
+                .boxed();
+            future_tx.send(future).is_ok()
+        });
+
+        if !is_all_sent {
+            break;
+        }
+
+        // Poll actor publishers
+        let time = Clock::to_builtin_time(&clock.get_now()?);
+        publishers.iter_mut().try_for_each(|(_id, pub_)| {
+            pub_.poll(&time)?;
+            anyhow::Ok(())
+        })?;
+
+        // Publish tick
+        bridge.tick.publish(&Empty {})?;
+    }
+
+    Ok(())
+}
+
+fn update_actors(
+    node: &mut Node,
+    world: &World,
+    publishers: &mut HashMap<ActorId, ActorPub>,
+) -> Result<Vec<ActorSub>> {
+    // List actors in the simulator
+    let mut actors: HashMap<ActorId, _> = world
+        .actors()
+        .iter()
+        .map(|actor| (actor.id(), actor))
+        .collect();
+
+    // Find new and vanishing actor IDs
+    let (new_keys, del_keys) = {
+        let curr_keys: HashSet<_> = actors.keys().cloned().collect();
+        let prev_keys: HashSet<_> = publishers.keys().cloned().collect();
+        let new_keys = &curr_keys - &prev_keys;
+        let del_keys = &prev_keys - &curr_keys;
+        (new_keys, del_keys)
+    };
+
+    if !new_keys.is_empty() {
+        log_info!(env!("CARGO_BIN_NAME"), "Adding new actors: {new_keys:?}");
+    }
+
+    if !del_keys.is_empty() {
+        log_info!(env!("CARGO_BIN_NAME"), "Removing actors: {del_keys:?}");
+    }
+
+    // Inert new actors
+    let subs: Vec<_> = new_keys
+        .into_iter()
+        .map(|id| {
+            let actor = actors.remove(&id).unwrap();
+            let (pub_, sub) = actor_node::new(node, actor)?;
+            publishers.insert(id, pub_);
+            anyhow::Ok(sub)
+        })
+        .try_collect()?;
+
+    // Remove vanishing actors
+    del_keys.into_iter().for_each(|id| {
+        publishers.remove(&id).unwrap();
+    });
+
+    Ok(subs)
 }
 
 // async fn forward_obj(sub: Subscriber<ObjectArray>, pub_: Publisher<DetectedObjects>) -> Result<()> {
@@ -349,71 +447,3 @@ async fn waiter(future_rx: flume::Receiver<BoxFuture<'static, ()>>) {
 
 //     Ok(())
 // }
-
-fn looper(
-    mut node: Node,
-    client: Client,
-    future_tx: flume::Sender<BoxFuture<'static, ()>>,
-) -> Result<()> {
-    let world = client.world();
-
-    let mut publishers: HashMap<ActorId, _> = HashMap::new();
-    let bridge = Bridge::new(&mut node)?;
-    let mut clock = Clock::create(ClockType::RosTime)?;
-
-    'tick: loop {
-        node.spin_once(Duration::from_millis(10));
-        world.wait_for_tick();
-
-        // Update actors
-        {
-            let mut actors: HashMap<ActorId, _> = world
-                .actors()
-                .iter()
-                .map(|actor| (actor.id(), actor))
-                .collect();
-
-            let curr_keys: HashSet<_> = actors.keys().cloned().collect();
-            let prev_keys: HashSet<_> = publishers.keys().cloned().collect();
-            let new_keys = &curr_keys - &prev_keys;
-            let del_keys = &prev_keys - &curr_keys;
-
-            if !new_keys.is_empty() {
-                log_info!(env!("CARGO_BIN_NAME"), "Adding new actors: {new_keys:?}");
-            }
-
-            if !del_keys.is_empty() {
-                log_info!(env!("CARGO_BIN_NAME"), "Removing actors: {del_keys:?}");
-            }
-
-            // Inert new actors
-            for id in new_keys {
-                let actor = actors.remove(&id).unwrap();
-                let (pub_, sub) = actor_node::new(&mut node, actor)?;
-                publishers.insert(id, pub_);
-
-                let result = future_tx.send(sub.into_future());
-                if result.is_err() {
-                    break 'tick;
-                }
-            }
-
-            // Remove vanishing actors
-            for id in del_keys {
-                publishers.remove(&id).unwrap();
-            }
-        }
-
-        // Poll actor publishers
-        let time = Clock::to_builtin_time(&clock.get_now()?);
-        publishers.iter_mut().try_for_each(|(_id, pub_)| {
-            pub_.poll(&time)?;
-            anyhow::Ok(())
-        })?;
-
-        // Publish tick
-        bridge.tick.publish(&Empty {})?;
-    }
-
-    Ok(())
-}

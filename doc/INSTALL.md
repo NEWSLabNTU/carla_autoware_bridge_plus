@@ -26,6 +26,7 @@ Install extra dependencies:
 
 ```bash
 sudo apt install ros-galactic-moveit-msgs
+pip install https://github.com/usdot-fhwa-stol/opendrive2lanelet/archive/develop.zip
 ```
 
 
@@ -56,8 +57,7 @@ The `ros-bridge` has git submodules. Remember to update them.
 
 ```bash
 cd repo/src/ros-bridge
-git submodule init
-git submodule update --recursive
+git submodule update --init --recursive
 ```
 
 The `autoware` tracks underlying dependencies using `vcs`. Please
