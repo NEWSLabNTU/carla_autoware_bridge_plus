@@ -22,6 +22,7 @@ pub fn new(node: &mut Node, world: World) -> Result<impl Future<Output = Result<
     Ok(srv)
 }
 
+/// Converts map format from OpenDrive to Lanlet2.
 struct MapConverter {
     _tmpdir: TempDir,
     input_path: PathBuf,
@@ -38,6 +39,10 @@ impl MapConverter {
         })
     }
 
+    /// Takes a OpenDrive string and converts it to Lanlet2 bytes.
+    ///
+    /// This function calls an external program
+    /// `opendrive2lanelet-convert`.
     pub fn opendrive_to_lanelet2(&self, opendrive: &str) -> Result<Vec<u8>> {
         let err = |stderr| {
             format!(
