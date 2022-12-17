@@ -13,7 +13,9 @@ Please read the [installation guide](doc/INSTALL.md).
 
 ## Usage
 
-Please read the [usage guide](doc/USAGE.md).
+The bridge is programmed as a ROS node. Please read the [usage
+guide](doc/USAGE.md) to learn about the launch process. The [ROS API
+reference](doc/API.md) lists ROS topics provided by this node.
 
 ## Bugs and Issues
 
