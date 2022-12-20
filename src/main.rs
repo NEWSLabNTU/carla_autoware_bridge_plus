@@ -3,9 +3,9 @@ mod bridge;
 mod map_srv;
 mod params;
 mod qos;
+mod time;
 mod types;
 mod utils;
-// mod control_physics;
 
 use anyhow::Result;
 use bridge::Bridge;
@@ -18,6 +18,7 @@ use std::{
     future::IntoFuture,
     time::Duration,
 };
+use time::TimeBuffer;
 use tokio::task::spawn_blocking;
 
 #[tokio::main]
@@ -360,10 +361,12 @@ fn looper(
     let mut publishers: HashMap<ActorId, _> = HashMap::new();
     let bridge = Bridge::new(&mut node)?;
     let mut clock = Clock::create(ClockType::RosTime)?;
+    let mut time_buffer = TimeBuffer::default();
 
     'tick: loop {
         node.spin_once(Duration::from_millis(10));
-        world.wait_for_tick();
+        let snapshot = world.wait_for_tick();
+        let time_delta = time_buffer.step(snapshot.timestamp());
 
         // Update actors
         {
@@ -405,9 +408,9 @@ fn looper(
         }
 
         // Poll actor publishers
-        let time = Clock::to_builtin_time(&clock.get_now()?);
+        let ros_time = Clock::to_builtin_time(&clock.get_now()?);
         publishers.iter_mut().try_for_each(|(_id, pub_)| {
-            pub_.poll(&time)?;
+            pub_.poll(&ros_time, time_delta.clone())?;
             anyhow::Ok(())
         })?;
 

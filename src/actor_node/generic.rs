@@ -1,5 +1,7 @@
 use std::future::IntoFuture;
 
+use crate::time::TimeDelta;
+
 use super::{
     other::{OtherPub, OtherSub},
     sensor::{SensorPub, SensorSub},
@@ -79,9 +81,9 @@ impl From<VehiclePub> for ActorPub {
 }
 
 impl ActorPub {
-    pub fn poll(&mut self, time: &Time) -> Result<()> {
+    pub fn poll(&mut self, time: &Time, time_delta: TimeDelta) -> Result<()> {
         match self {
-            ActorPub::Vehicle(pub_) => pub_.poll(time)?,
+            ActorPub::Vehicle(pub_) => pub_.poll(time, time_delta)?,
             ActorPub::Sensor(pub_) => pub_.poll(time)?,
             ActorPub::TrafficSign(pub_) => pub_.poll(time)?,
             ActorPub::Other(pub_) => pub_.poll(time)?,
