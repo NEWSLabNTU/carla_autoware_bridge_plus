@@ -31,10 +31,11 @@ The topics are defined for any actor kinds.
 
 ### Vehicle Topics
 
-| Kind | Name               | Interface                                                                                                                               | Description                                                     |
-|------|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|
-| pub  | `<P>/vehicle_info` | [`carla_msgs/msg/CarlaEgoVehicleInfo`](https://carla.readthedocs.io/projects/ros-bridge/en/latest/ros_msgs/#carlaegovehicleinfomsg)       | Vehicle information including max steering angle, etc.          |
-| sub  | `<P>/control_cmd`  | [`carla_msgs/msg/CarlaEgoVehicleControl`](https://carla.readthedocs.io/projects/ros-bridge/en/latest/ros_msgs/#carlaegovehiclecontrolmsg) | Vehicle driving parameters, including brake, throttle and steer |
+| Kind | Name                | Interface                                                                                                                                 | Description                                                 |
+|------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|
+| pub  | `<P>/vehicle_info`  | [`carla_msgs/msg/CarlaEgoVehicleInfo`](https://carla.readthedocs.io/projects/ros-bridge/en/latest/ros_msgs/#carlaegovehicleinfomsg)       | Vehicle information including max steering angle, etc.      |
+| sub  | `<P>/control_cmd`   | [`carla_msgs/msg/CarlaEgoVehicleControl`](https://carla.readthedocs.io/projects/ros-bridge/en/latest/ros_msgs/#carlaegovehiclecontrolmsg) | Brake, throttle and steer and other controlling parameters. |
+| sub  | `<P>/ackermann_cmd` | `autoware_control_msgs/msg/Control`                                                                                                       | Target vehicle speed and acceleration, etc.                 |
 
 ### Sensor Topics
 
