@@ -1,11 +1,14 @@
 # CARLA-Autoware Bridge Plus
 
 The bridge exposes Carla simulator parameters and object entities to
-ROS 2 topics in Autoware message types.
+ROS 2 topics in Autoware message types. It supports the following
+features:
 
-This repository is still in alpha stage. Great refactoring is
-expected.
-
+- Automatic topic creation for newly added vehicles and other actors.
+- Multi-vehicle and multi-actor message publication/subscription.
+- Support both direct and Ackermann vehicle control.
+- Direct connection to Carla Simulator without going through extra
+  bridges.
 
 ## Installation
 
