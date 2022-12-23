@@ -29,6 +29,5 @@ r2r_common = { git = "https://github.com/jerry73204/r2r.git", rev = "6644562704a
 r2r_rcl = { git = "https://github.com/jerry73204/r2r.git", rev = "6644562704a76b942e5bc11784240efc1dd24285" }
 r2r_actions = { git = "https://github.com/jerry73204/r2r.git", rev = "6644562704a76b942e5bc11784240efc1dd24285" }
 r2r_msg_gen = { git = "https://github.com/jerry73204/r2r.git", rev = "6644562704a76b942e5bc11784240efc1dd24285" }
-
-carla = { path = "/home/aeon/repos/carla-rust/carla" }
+carla = { git = "https://github.com/jerry73204/carla-rust.git", rev = "a85a3a80f0a2542e72e1df12f52b21e8653470da" }
 carla-ackermann = { git = "https://github.com/NEWSLabNTU/carla-ackermann.git", rev = "ad7cfbfeb8dc0cd7572e8b72ac8a0f48d9e5571e" }
