@@ -362,10 +362,21 @@ fn looper(
     let bridge = Bridge::new(&mut node)?;
     let mut clock = Clock::create(ClockType::RosTime)?;
     let mut time_buffer = TimeBuffer::default();
+    let mut world_id = world.id();
 
     'tick: loop {
         node.spin_once(Duration::from_millis(10));
         let snapshot = world.wait_for_tick();
+
+        // Reset time buffer if world ID changed.
+        {
+            let curr_world_id = snapshot.id();
+            if world_id != curr_world_id {
+                time_buffer = TimeBuffer::default();
+            }
+            world_id = curr_world_id;
+        }
+
         let time_delta = time_buffer.step(snapshot.timestamp());
 
         // Update actors
