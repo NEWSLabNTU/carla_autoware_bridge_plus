@@ -59,7 +59,7 @@ fn get_carla_port(params: &ParamsMap) -> Result<u16> {
 }
 
 fn get_carla_timeout_millis(params: &ParamsMap) -> Result<u64> {
-    let Some(value) = params.get(PARAM_CARLA_PORT) else {
+    let Some(value) = params.get(PARAM_CARLA_TIMEOUT_MILLIS) else {
         log_warn!(env!("CARGO_BIN_NAME"), "Using default value '{}' for parameter '{}'", DEFAULT_CARLA_TIMEOUT_MILLIS, PARAM_CARLA_TIMEOUT_MILLIS);
         return Ok(DEFAULT_CARLA_TIMEOUT_MILLIS);
     };
