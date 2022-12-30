@@ -59,6 +59,8 @@ impl MapConverter {
         } = Command::new("opendrive2lanelet-convert")
             .arg("-f")
             .arg(&self.input_path)
+            .arg("-o")
+            .arg("/dev/stdout")
             .output()
             .with_context(|| err(""))?;
 
