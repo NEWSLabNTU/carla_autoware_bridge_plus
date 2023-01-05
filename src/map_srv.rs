@@ -61,6 +61,8 @@ impl MapConverter {
             .arg(&self.input_path)
             .arg("-o")
             .arg("/dev/stdout")
+            .arg("--osm")
+            .arg("+proj=utm +zone=32 +ellps=WGS84")
             .output()
             .with_context(|| err(""))?;
 
